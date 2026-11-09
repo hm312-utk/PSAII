@@ -1,0 +1,199 @@
+<!-- src/app/tab1/tab1.page.html -->
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Menú</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <main class="menu" [class.con-carrito]="hayProductos()">
+    @if (categorias().length === 0) {
+      <div class="estado">
+        @if (cargando()) {
+          <ion-spinner name="crescent"></ion-spinner>
+          <p>Cargando el menú…</p>
+        } @else if (errorCatalogo()) {
+          <p>No se pudo cargar el menú. Revisa la conexión e inténtalo de nuevo.</p>
+          <ion-button (click)="cargarCatalogo()">Reintentar</ion-button>
+        } @else {
+          <p>Hoy no hay productos disponibles.</p>
+        }
+      </div>
+    }
+
+    @for (categoria of categorias(); track categoria.id_categoria) {
+      <section class="categoria">
+        <h2>{{ categoria.nombre }}</h2>
+        @if (categoria.descripcion) {
+          <p class="categoria-desc">{{ categoria.descripcion }}</p>
+        }
+
+        <ion-grid>
+          <ion-row>
+            @for (producto of categoria.productos; track producto.id_producto) {
+              <ion-col size="6" sizeMd="4" sizeLg="3">
+                <ion-card class="producto">
+                  @if (cantidades().get(producto.id_producto); as enCarrito) {
+                    <ion-badge class="en-carrito">×{{ enCarrito }}</ion-badge>
+                  }
+                  @if (producto.imagen_url) {
+                    <ion-img [src]="producto.imagen_url" [alt]="producto.nombre"></ion-img>
+                  } @else {
+                    <div class="sin-imagen" aria-hidden="true"><ion-icon name="restaurant-outline"></ion-icon></div>
+                  }
+
+                  <ion-card-header>
+                    <ion-card-title>{{ producto.nombre }}</ion-card-title>
+                  </ion-card-header>
+                  <ion-card-content>
+                    <p class="descripcion">{{ producto.descripcion }}</p>
+                  </ion-card-content>
+
+                  <div class="pie">
+                    <span class="precio">{{ dinero(producto.precio) }}</span>
+                    <ion-button (click)="cart.addItem(producto)">
+                      <ion-icon slot="start" name="add"></ion-icon>
+                      Añadir
+                    </ion-button>
+                  </div>
+                </ion-card>
+              </ion-col>
+            }
+          </ion-row>
+        </ion-grid>
+      </section>
+    }
+  </main>
+
+  <!-- Botón Super-Atajo IA actualizado -->
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end" [class.sobre-panel]="hayProductos()">
+    <ion-fab-button aria-label="Super-Atajo IA" (click)="abrirChat()">
+      <ion-icon name="sparkles"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+</ion-content>
+
+<!-- Modal del Carrito (Intacto) -->
+<ion-modal
+  [isOpen]="hayProductos()"
+  [initialBreakpoint]="0.25"
+  [breakpoints]="[0.25, 0.5, 1]"
+  [backdropBreakpoint]="0.5"
+  [backdropDismiss]="false"
+  [keyboardClose]="false"
+  handleBehavior="cycle"
+>
+  <ng-template>
+    <ion-content>
+      <div class="panel">
+        <div class="panel-cabecera">
+          <div>
+            <h2>Tu pedido</h2>
+            <p>{{ mesa }} · {{ unidades() }} {{ unidades() === 1 ? 'producto' : 'productos' }}</p>
+          </div>
+          <strong class="panel-total" aria-live="polite">{{ dinero(total()) }}</strong>
+        </div>
+
+        @if (pagoBloqueado()) {
+          <div class="aviso" role="alert">
+            <ion-icon name="warning-outline" aria-hidden="true"></ion-icon>
+            <p>Hay un cobro sin registrar. Avisa a caja con la referencia: el pago queda bloqueado para no cobrar dos veces.</p>
+            <ion-button size="small" (click)="nuevoPedido()">Nuevo pedido</ion-button>
+          </div>
+        }
+
+        <div #gpayContainer class="gpay" [attr.inert]="procesando() || pagoBloqueado() ? '' : null"></div>
+        @if (procesando()) {
+          <ion-progress-bar type="indeterminate" aria-label="Procesando el pago"></ion-progress-bar>
+        }
+        @if (gpayDisponible() === null) {
+          <p class="hint">Comprobando Google Pay…</p>
+        } @else if (gpayDisponible() === false) {
+          <p class="hint">Google Pay no está disponible en este dispositivo.</p>
+        }
+
+        <div [attr.inert]="procesando() ? '' : null">
+          <ion-list lines="full">
+            @for (item of items(); track item.id_producto) {
+              <ion-item>
+                <ion-label class="ion-text-wrap">
+                  <h3>{{ item.nombre }}</h3>
+                  <p>{{ dinero(item.precio) }} c/u</p>
+                </ion-label>
+                <div class="cantidad" slot="end">
+                  <ion-button fill="clear" size="small" (click)="cart.removeItem(item.id_producto)">
+                    <ion-icon slot="icon-only" name="remove-circle-outline"></ion-icon>
+                  </ion-button>
+                  <span>{{ item.cantidad }}</span>
+                  <ion-button fill="clear" size="small" (click)="cart.addItem(item)">
+                    <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
+                  </ion-button>
+                </div>
+                <ion-note slot="end">{{ dinero(item.subtotal) }}</ion-note>
+              </ion-item>
+            }
+          </ion-list>
+          <ion-button fill="clear" size="small" color="medium" (click)="cart.clearCart()">
+            <ion-icon slot="start" name="trash-outline"></ion-icon>
+            Vaciar pedido
+          </ion-button>
+        </div>
+      </div>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<!-- NUEVO: Modal del Chat IA -->
+<ion-modal 
+  [isOpen]="chatAbierto()" 
+  (didDismiss)="cerrarChat()" 
+  [initialBreakpoint]="0.75" 
+  [breakpoints]="[0, 0.75, 1]"
+>
+  <ng-template>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-title>Mesero IA</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="cerrarChat()">
+            <ion-icon slot="icon-only" name="close"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    
+    <ion-content class="chat-content">
+      <div class="mensajes-container">
+        @for (msg of chatMensajes(); track $index) {
+          <div class="mensaje" [class.user]="msg.role === 'user'" [class.ia]="msg.role === 'assistant'">
+            <p>{{ msg.content }}</p>
+          </div>
+        }
+        @if (iaPensando()) {
+          <div class="mensaje ia pensando">
+            <ion-spinner name="dots"></ion-spinner>
+          </div>
+        }
+      </div>
+    </ion-content>
+
+    <ion-footer class="ion-no-border">
+      <ion-toolbar>
+        <div class="chat-input-container">
+          <ion-input 
+            #chatInput 
+            placeholder="¿Qué se te antoja hoy?" 
+            (keyup.enter)="enviarMensajeIA(chatInput)"
+            [disabled]="iaPensando()">
+          </ion-input>
+          <ion-button 
+            fill="clear" 
+            (click)="enviarMensajeIA(chatInput)" 
+            [disabled]="iaPensando() || !chatInput.value">
+            <ion-icon slot="icon-only" name="send"></ion-icon>
+          </ion-button>
+        </div>
+      </ion-toolbar>
+    </ion-footer>
+  </ng-template>
+</ion-modal>

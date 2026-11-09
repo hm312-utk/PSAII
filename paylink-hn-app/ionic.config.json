@@ -1,0 +1,7 @@
+{
+  "name": "paylink-hn-app",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
