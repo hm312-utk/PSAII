@@ -1,0 +1,25 @@
+# /etc/systemd/system/paylink-api.service
+[Unit]
+Description=PayLink HN API (Node.js)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=paylink
+Group=paylink
+WorkingDirectory=/opt/paylink-hn/backend
+# Secretos fuera del repositorio (chmod 640, root:paylink). Formato KEY=valor, sin comentarios al final de línea.
+EnvironmentFile=/etc/paylink-hn/api.env
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=3
+
+# Endurecimiento básico
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
